@@ -1,0 +1,78 @@
+from argparse import ArgumentParser
+from webmacs import variables, main, keymaps, commands
+
+
+def init_custom_keys():
+    """Custom Keys are defined in this function LOL"""
+    # NOTE: Custom keymap from here, though there should be a user
+    #       keymap input file
+    content_edit_keymap = keymaps.keymap("webcontent-edit")
+    content_edit_keymap.define_key("C-v", "scroll-page-down")
+    content_edit_keymap.define_key("M-v", "scroll-page-up")
+    content_edit_keymap.define_key("M->", "scroll-bottom")
+    content_edit_keymap.define_key("M-<", "scroll-top")
+    webbuffer_keymap = keymaps.keymap("webbuffer")
+    webbuffer_keymap.define_key("c 0", "copy-current-buffer-url")
+    webbuffer_keymap.define_key("j", "send-key-down")
+    webbuffer_keymap.define_key("k", "send-key-up")
+    # NOTE: standard text selection bindings may work the same in caret browsing mode
+    webbuffer_keymap.define_key("C-F", "content-edit-forward-char")
+    webbuffer_keymap.define_key("C-B", "content-edit-backward-char")
+    webbuffer_keymap.define_key("M-F", "content-edit-forward-word")
+    webbuffer_keymap.define_key("M-B", "content-edit-backward-word")
+    webbuffer_keymap.define_key("M-E", "content-edit-end-of-line")
+
+
+def init_custom_webjumps():
+    "Custom webjumps, like custom keys"
+    commands.webjump.define_webjump("scholar",
+                                    "https://scholar.google.com/scholar?hl=en&q=%s",
+                                    "Scholar Search")
+
+
+def init_custom_commands():
+    "Whatever custom commands you'd want to create"
+    @commands.define_command("go-up")
+    def go_up(ctx):
+        """Navigate upwards with respect to URL in current buffer.
+
+        A state per webbuffer is tracked and kept in _base_url. If we go up but
+        base_url remains the same, e.g. going up from
+        "http://somewebsite.com/somedir/somepage.html" lands on
+        "http://somewebsite.com/somedir/" which redirects to
+        "http://somewebsite.com/somedir/index.html" then we go further up next
+        time to "http://somewebsite.com/"
+
+        """
+        url = str(ctx.buffer.url().toEncoded(), "utf-8")
+        url = url if not url.endswith("/") else url[:-1]
+        url = "/".join(url.split("/")[:-1])
+        if hasattr(ctx.buffer, "_base_url"):
+            if ctx.buffer._base_url == url:
+                url = "/".join(url[:-1].split("/")[:-1])
+        print(f"[DEBUG] {url}")
+        ctx.buffer._base_url = url
+        ctx.buffer.load(url)
+
+    keymaps.keymap("webbuffer").define_key("u", "go-up")
+
+
+def init(opts, user_opts):
+    parser = ArgumentParser()
+    parser.add_argument("--proxy", type=str, default="")
+    parser.add_argument("--proxy-dns", action="store_true")
+    args = parser.parse_args(user_opts)
+    # TODO: Set checks for args.proxy
+    if args.proxy:
+        print(f"Setting proxy as {args.proxy}")
+        variables.set("proxy", args.proxy)
+        # TODO: Only if socks proxy
+        if args.proxy_dns:
+            print(f"DNS requests will also be proxied")
+            variables.set("proxy-dns-requests", True)
+    init_custom_keys()
+    init_custom_commands()
+    init_custom_webjumps()
+    if opts.url:
+        print("{} was given as a command line argument".format(opts.url))
+    main.init(opts)
