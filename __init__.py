@@ -1,5 +1,39 @@
 from argparse import ArgumentParser
-from webmacs import variables, main, keymaps, commands
+import logging
+from webmacs import variables, main, keymaps, commands, session, application, hooks
+
+
+logger = logging.getLogger()
+
+
+def save_session(*args, **kwargs):
+    """
+    Save windows and buffers.
+    """
+    if variables.get("save-session-on-buffer-event"):
+        session.session_save(application.app().profile.session_file)
+        logger.info("Saving Session")
+
+
+def init_custom_variables():
+    variables.define_variable(
+        "save-session-on-buffer-event",
+        "If set to True, the session file will get updated every time"
+        " a buffer is opened or closed.",
+        False,
+        type=variables.Bool())
+
+
+def set_variables():
+    """Set values to variables."""
+    variables.set("visited-links-display-limit", 10000)
+    variables.set("save-session-on-buffer-event", True)
+
+
+def init_hooks():
+    hooks.webbuffer_closed.add(save_session)
+    # added to load_finished as create gives some error
+    hooks.webbuffer_load_finished.add(save_session)
 
 
 def init_custom_keys():
@@ -50,9 +84,18 @@ def init_custom_commands():
         if hasattr(ctx.buffer, "_base_url"):
             if ctx.buffer._base_url == url:
                 url = "/".join(url[:-1].split("/")[:-1])
-        print(f"[DEBUG] {url}")
+        logger.debug(f"[DEBUG] {url}")
         ctx.buffer._base_url = url
         ctx.buffer.load(url)
+
+    @commands.define_command("set-variable")
+    def set_variable(ctx):
+        """Set a value for a named variable.
+        """
+        # We have to implement a function which reads a variable from a prompt
+        # like in [[file:~/lib/webmacs/webmacs/commands/global.py::class BookmarkAddPrompt(Prompt):][bookmark prompt]] and that parses the type
+        pass
+
 
     keymaps.keymap("webbuffer").define_key("u", "go-up")
 
@@ -64,15 +107,18 @@ def init(opts, user_opts):
     args = parser.parse_args(user_opts)
     # TODO: Set checks for args.proxy
     if args.proxy:
-        print(f"Setting proxy as {args.proxy}")
+        logger.info(f"Setting proxy as {args.proxy}")
         variables.set("proxy", args.proxy)
         # TODO: Only if socks proxy
         if args.proxy_dns:
-            print(f"DNS requests will also be proxied")
+            logger.info(f"DNS requests will also be proxied")
             variables.set("proxy-dns-requests", True)
     init_custom_keys()
     init_custom_commands()
     init_custom_webjumps()
+    init_custom_variables()
+    set_variables()
+    init_hooks()
     if opts.url:
-        print("{} was given as a command line argument".format(opts.url))
+        logger.info("{} was given as a command line argument".format(opts.url))
     main.init(opts)
