@@ -18,9 +18,14 @@ def save_session(*args, **kwargs):
 def init_custom_variables():
     variables.define_variable(
         "save-session-on-buffer-event",
-        "If set to True, the session file will get updated every time"
+        "If set to True, the session file will get updated every time" +
         " a buffer is opened or closed.",
         False,
+        type=variables.Bool())
+    variables.define_variable(
+        "always-restore-session",
+        "Always restore session regardless of whether a URL is given on cmdline",
+        True,
         type=variables.Bool())
 
 
@@ -62,6 +67,9 @@ def init_custom_webjumps():
     commands.webjump.define_webjump("scholar",
                                     "https://scholar.google.com/scholar?hl=en&q=%s",
                                     "Scholar Search")
+    commands.webjump.define_webjump("bing",
+                                    "https://www.bing.com/search?q=%s&form=QBLH"
+                                    "Bing Search")
 
 
 def init_custom_commands():
