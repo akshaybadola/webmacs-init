@@ -3,6 +3,7 @@ import logging
 from webmacs import variables, main, keymaps, commands, session, application, hooks
 
 
+webcontent = logging.getLogger("webcontent")
 logger = logging.getLogger()
 
 
@@ -33,12 +34,26 @@ def set_variables():
     """Set values to variables."""
     variables.set("visited-links-display-limit", 10000)
     variables.set("save-session-on-buffer-event", True)
+    variables.set("log-to-disk-max-files", 1)
+    variables.set("log-to-disk-persist", True)
+
+
+def log_url_open(*args, **kwargs):
+    url = args[0].url().url()
+    webcontent.log(logging.INFO, "OPENED", extra={"url": url})
+
+
+def log_url_close(*args, **kwargs):
+    url = args[0].url().url()
+    webcontent.log(logging.INFO, "CLOSED", extra={"url": url})
 
 
 def init_hooks():
     hooks.webbuffer_closed.add(save_session)
     # added to load_finished as create gives some error
     hooks.webbuffer_load_finished.add(save_session)
+    # hooks.webbuffer_load_finished.add(log_url_open)
+    # hooks.webbuffer_closed.add(log_url_close)
 
 
 def init_custom_keys():
@@ -119,7 +134,7 @@ def init(opts, user_opts):
         variables.set("proxy", args.proxy)
         # TODO: Only if socks proxy
         if args.proxy_dns:
-            logger.info(f"DNS requests will also be proxied")
+            logger.info("DNS requests will also be proxied")
             variables.set("proxy-dns-requests", True)
     init_custom_keys()
     init_custom_commands()
